@@ -1,0 +1,24 @@
+{
+    "logs_dir": "logs",
+
+    "player": {
+        "uid": 1503424903,
+        "region": "prod_gf_eu"
+    },
+
+    "api": {
+        "protocol": "https",
+        "host": "sg-public-api.hoyolab.com",
+        "request_timeout": 1, 
+        "cache_ttl": 1800,
+        "zzz_api_urls": {
+            "base": "/event/game_record_zzz/api/zzz/",
+            "mem_detail": "mem_detail"
+        }
+    },
+
+    "headers": {
+        "Cookie": "",
+        "x-rpc-lang": "ru-ru"
+    }
+}
