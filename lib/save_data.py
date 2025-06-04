@@ -1,9 +1,15 @@
 import os
 import json
+from typing import TYPE_CHECKING
 
 from .data_classes import DeadlyAssaultStruct
 from .logger import get_logger
 from .utils import singleton
+
+if TYPE_CHECKING:
+    from typing import Callable
+
+    from datetime import datetime
 
 _log = get_logger(__file__, "SavedDataApi")
 
@@ -24,6 +30,12 @@ class SavedData:
     
     def get(self) -> list[DeadlyAssaultStruct]:
         return self.data
+    
+    def sort(self, 
+             key: 'Callable[[DeadlyAssaultStruct], datetime]' = lambda x: x.start_time.to_datetime(), 
+             reverse: bool = True) -> 'SavedData':
+        self.data.sort(key=key, reverse=reverse)
+        return self
     
     def append(self, struct: DeadlyAssaultStruct) -> 'SavedData':
         self.data.append(struct)
