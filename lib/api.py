@@ -17,13 +17,14 @@ _config = Config().get()
 
 @singleton
 class Api:
-    base_headers = {
-        "Origin": "https://act.hoyolab.com", 
-        "Referer": "https://act.hoyolab.com/", 
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:139.0) Gecko/20100101 Firefox/139.0"
-    }
-    cache = Cache(ttl=_config.api.cache_ttl)
-    session: ClientSession = None
+    def __init__(self):
+        self.base_headers = {
+            "Origin": "https://act.hoyolab.com", 
+            "Referer": "https://act.hoyolab.com/", 
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:139.0) Gecko/20100101 Firefox/139.0"
+        }
+        self.cache = Cache(ttl=_config.api.cache_ttl)
+        self.session: ClientSession = None
 
     @staticmethod
     def _validate_headers(data: Any) -> bool:

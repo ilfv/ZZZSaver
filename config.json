@@ -9,7 +9,7 @@
     "api": {
         "protocol": "https",
         "host": "sg-public-api.hoyolab.com",
-        "request_timeout": 1, 
+        "request_timeout": 1.5, 
         "cache_ttl": 1800,
         "zzz_api_urls": {
             "base": "/event/game_record_zzz/api/zzz/",
@@ -18,7 +18,6 @@
     },
 
     "headers": {
-        "Cookie": "",
         "x-rpc-lang": "ru-ru"
     }
 }
