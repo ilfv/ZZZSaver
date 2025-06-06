@@ -1,15 +1,20 @@
+import asyncio
 import json
-from typing import Any
+from functools import cached_property
+from typing import TYPE_CHECKING
 
 from aiohttp import ClientSession, ClientResponse
 from cacheout import Cache
 
-from .data_classes import DeadlyAssaultStruct
+from .data_classes import DeadlyAssaultStruct, RResultStruct, GetImagesReturnStruct
 from .enums import SeasonTypeEnum
 from .errors import ApiError, EmptyResponce
 from .settings import Config
 from .logger import get_logger
 from .utils import singleton
+
+if TYPE_CHECKING:
+    from typing import Any
 
 _log = get_logger(__file__, "ApiLog")
 _config = Config().get()
@@ -23,11 +28,12 @@ class Api:
             "Referer": "https://act.hoyolab.com/", 
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:139.0) Gecko/20100101 Firefox/139.0"
         }
-        self.cache = Cache(ttl=_config.api.cache_ttl)
+        self.mem_detail_cache = Cache(ttl=_config.api.mem_detail_cache_ttl)
+        self.image_cache = Cache(ttl=_config.api.image_cache_ttl)
         self.session: ClientSession = None
 
     @staticmethod
-    def _validate_headers(data: Any) -> bool:
+    def _validate_headers(data: 'Any') -> bool:
         if not isinstance(data, dict):
             return False
         
@@ -42,20 +48,32 @@ class Api:
             self.session = ClientSession()
         
         return self.session
-
-    def _get_headers(self, **extra) -> dict[str, str]:
-        validation_failed = False
-
-        if extra:
-            if not self._validate_headers(extra):
-                _log.warning("invalid extra headers, ignoring")
-                validation_failed = True
-        
-        return self.base_headers | _config.headers | (extra if not validation_failed else {})
+    
+    @cached_property
+    def _get_headers(self) -> dict[str, str]:        
+        return self.base_headers | _config.headers
     
     def _build_url(self, **params) -> str:
         cfg = _config.api
-        return f"{cfg.protocol}://{cfg.host}{cfg.zzz_api_urls.base}{cfg.zzz_api_urls.mem_detail}?" + '&'.join(f"{key}={val}" for key, val in params.items())
+        return f"{cfg.protocol}://{cfg.host}{cfg.zzz_api_urls.base}{cfg.zzz_api_urls.mem_detail}{'?' * (not not params)}" \
+              + '&'.join(f"{key}={val}" for key, val in params.items())
+    
+    async def _get_img(self, url: str, need_caching: bool = True) -> bytes:
+        if url in self.image_cache:
+            return self.image_cache.get(url)
+        async with (await self._update_session()).get(url) as responce:
+            data = await responce.content.read()
+        
+        if need_caching:
+            self.image_cache.set(url, data)
+        
+        return data
+
+    async def _get_images(self, url: str, keys: list[str]) -> None:
+        tdata = self._giret
+        for key in keys[:-1]:
+            tdata = tdata.setdefault(key, {})
+        tdata[keys[-1]] = await self._get_img(url)
     
     async def responce_handler(self, responce: ClientResponse) -> dict:
         responce_text = await responce.text()
@@ -82,11 +100,50 @@ class Api:
                                      uid: int = _config.player.uid, 
                                      region: str = _config.player.region, 
                                      season: SeasonTypeEnum = SeasonTypeEnum.CURRENT,
+                                     need_caching: bool = True,
                                      **extra_headers) -> DeadlyAssaultStruct:
         url = self._build_url(uid=uid, region=region, schedule_type=season.value if isinstance(season, SeasonTypeEnum) else int(season))
-        headers = self._get_headers(**extra_headers)
+
+        if url in self.mem_detail_cache:
+            return self.mem_detail_cache.get(url)
+        
+        headers = self._get_headers
+        headers |= extra_headers if self._validate_headers(extra_headers) else {}
         
         async with (await self._update_session()).get(url, headers=headers) as responce:
             data = await self.responce_handler(responce)
         
-        return DeadlyAssaultStruct.model_validate(data)
+        data = DeadlyAssaultStruct.model_validate(data)
+        if need_caching:
+            self.mem_detail_cache.set(url, data)
+        
+        return data
+    
+    
+    async def get_images(self, data: RResultStruct) -> GetImagesReturnStruct:
+        order = [[avatar.id for avatar in data.avatar_list], 
+                 [*range(len(data.boss))], 
+                 [*range(len(data.buffer))]]
+        self._giret = {"avatars": {}, "boss": {}, "buff": {}, "buddy": ...}
+
+        idata = [(avatar.role_square_url, ["avatars", avatar.id]) for avatar in data.avatar_list]
+        idata.extend((getattr(boss, key), ["boss", ind, key]) for ind, boss in enumerate(data.boss) \
+                        for key in ["icon", "race_icon", "bg_icon"])
+        idata.extend((buff.icon, ["buff", ind]) for ind, buff in enumerate(data.buffer))
+        idata.append((data.buddy.bangboo_rectangle_url, ["buddy"]))
+
+        async with asyncio.TaskGroup() as groug:
+            for itup in idata:
+                groug.create_task(self._get_images(*itup))
+        
+        await self.session.close()
+        
+        odata = {
+            "avatars": [self._giret["avatars"][avatar_id] for avatar_id in order[0]],
+            "boss": [{key: self._giret["boss"][ind][key] for key in ["icon", "race_icon", "bg_icon"]} for ind in order[1]],
+            "buff": [self._giret["buff"][ind] for ind in order[2]],
+            "buddy": self._giret["buddy"]
+        }
+        del self._giret
+
+        return GetImagesReturnStruct.model_validate(odata)

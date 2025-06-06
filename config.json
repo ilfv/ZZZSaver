@@ -10,7 +10,8 @@
         "protocol": "https",
         "host": "sg-public-api.hoyolab.com",
         "request_timeout": 1.5, 
-        "cache_ttl": 1800,
+        "mem_detail_cache_ttl": 1800,
+        "image_cache_ttl": 1800,
         "zzz_api_urls": {
             "base": "/event/game_record_zzz/api/zzz/",
             "mem_detail": "mem_detail"

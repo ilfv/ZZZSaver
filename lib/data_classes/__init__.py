@@ -1,2 +1,2 @@
-from .api import DeadlyAssaultStruct
+from .api import *
 from .settings import ConfigStruct

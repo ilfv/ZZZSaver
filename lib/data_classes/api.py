@@ -44,6 +44,13 @@ class AvatarStruct(BaseModel):
     rank: int
     role_square_url: str
     sub_element_type: int
+
+
+class BuddyStruct(BaseModel):
+    id: int
+    rarity: str
+    level: int
+    bangboo_rectangle_url: str
     
 
 class RResultStruct(BaseModel):
@@ -54,19 +61,31 @@ class RResultStruct(BaseModel):
     boss: list[BossStruct]
     buffer: list[BufferStruct]
     avatar_list: list[AvatarStruct]
+    buddy: BuddyStruct
 
 
 class DeadlyAssaultStruct(BaseModel):
     start_time: TimeStruct
     end_time: TimeStruct
 
-    rank_percent: int
-
-    list: list[RResultStruct]
-
-    has_data: bool
     nick_name: str
     avatar_icon: str
     total_score: int
     total_star: int
     zone_id: int
+    rank_percent: int
+
+    list: list[RResultStruct]
+
+
+class GIBossStruct(BaseModel):
+    icon: bytes
+    race_icon: bytes
+    bg_icon: bytes
+
+
+class GetImagesReturnStruct(BaseModel):
+    avatars: list[bytes]
+    boss: list[GIBossStruct]
+    buff: list[bytes]
+    buddy: bytes

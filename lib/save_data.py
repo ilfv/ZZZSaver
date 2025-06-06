@@ -7,17 +7,22 @@ from .logger import get_logger
 from .utils import singleton
 
 if TYPE_CHECKING:
-    from typing import Callable
-
-    from datetime import datetime
+    from typing import Any, Callable
 
 _log = get_logger(__file__, "SavedDataApi")
 
 
 @singleton
 class SavedData:
+    data: list[DeadlyAssaultStruct]
+
     def __init__(self, path: str = "data.json"):
-        self.data = json.load(open(path, encoding="utf-8")) if os.path.exists(path) else []
+        self.data = []
+        if os.path.exists(path):
+            tdata: dict = json.load(open(path, encoding="utf-8"))
+            
+            for model in tdata.get("data", []):
+                self.data.append(DeadlyAssaultStruct.model_validate(model))
     
     def __getitem__(self, index):
         return self.data[index]
@@ -28,11 +33,18 @@ class SavedData:
     def __len__(self):
         return len(self.data)
     
+    def load_extra_save(self, path: str = "extra.txt", try_save2json: bool = True):
+        for line in open(path, encoding="utf-8").readlines():
+            self.data.append(DeadlyAssaultStruct.model_validate_json(line.strip()))
+
+        if try_save2json:
+            self.save2json()
+    
     def get(self) -> list[DeadlyAssaultStruct]:
         return self.data
     
     def sort(self, 
-             key: 'Callable[[DeadlyAssaultStruct], datetime]' = lambda x: x.start_time.to_datetime(), 
+             key: 'Callable[[DeadlyAssaultStruct], Any]' = lambda x: x.start_time.to_datetime(), 
              reverse: bool = True) -> 'SavedData':
         self.data.sort(key=key, reverse=reverse)
         return self
@@ -43,11 +55,12 @@ class SavedData:
     
     def save2json(self, path: str = "data.json") -> bool:
         try:
-            json.dump({"data": self.data}, open(path, 'w', encoding='utf-8'), indent=2)
+            json.dump({"data": [model.model_dump() for model in self.data]}, open(path, 'w', encoding='utf-8'), indent=2)
             result = True
         except Exception as exc:
             _log.error(f"Error '{exc}' while saving data")
-            open("extra.txt", 'w', encoding='utf-8').write(str(self.data))
+            text = '\n'.join(model.model_dump_json() for model in self.data)
+            open("extra.txt", 'w', encoding='utf-8').write(text)
             result = False
         
         return result

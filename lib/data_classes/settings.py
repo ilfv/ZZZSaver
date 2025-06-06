@@ -10,7 +10,8 @@ class ApiStruct(BaseModel):
     protocol: str
     host: str
     request_timeout: float
-    cache_ttl: int
+    mem_detail_cache_ttl: int
+    image_cache_ttl: int
 
     zzz_api_urls: ZzzApiUrlsStruct
 
