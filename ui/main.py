@@ -1,5 +1,4 @@
 import sys; sys.path.append(".")
-import asyncio
 from tkinter import messagebox
 from typing import TYPE_CHECKING
 
@@ -8,6 +7,7 @@ import customtkinter as ctk
 from lib.api import Api
 from lib.save_data import SavedData
 from ui.frames import DATotalFrame, DetailFrame
+from ui.utils import run_async
 
 if TYPE_CHECKING:
     from typing import Callable
@@ -57,7 +57,7 @@ class App(ctk.CTk):
 
 if __name__ == "__main__":
     try:
-        asyncio.run(update_info())
+        run_async(update_info())
     except Exception as exc:
         messagebox.showerror("Error while updating data", exc)
 
