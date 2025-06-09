@@ -2,4 +2,5 @@ aiohttp==3.12.7
 pydantic==2.11.5
 cacheout==0.16.0
 pillow==11.2.1
-#customtkinter==5.2.2
+customtkinter==5.2.2
+requests==2.32.3

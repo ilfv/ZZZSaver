@@ -7,7 +7,7 @@ from .logger import get_logger
 from .utils import singleton
 
 if TYPE_CHECKING:
-    from typing import Any, Callable
+    from typing import Any, Callable, Iterable
 
 _log = get_logger(__file__, "SavedDataApi")
 
@@ -24,7 +24,7 @@ class SavedData:
             for model in tdata.get("data", []):
                 self.data.append(DeadlyAssaultStruct.model_validate(model))
     
-    def __getitem__(self, index):
+    def __getitem__(self, index) -> DeadlyAssaultStruct:
         return self.data[index]
     
     def __delitem__(self, index):
@@ -32,6 +32,9 @@ class SavedData:
     
     def __len__(self):
         return len(self.data)
+    
+    def __contains__(self, other: DeadlyAssaultStruct) -> bool:
+        return other.zone_id in [das.zone_id for das in self.data]
     
     def load_extra_save(self, path: str = "extra.txt", try_save2json: bool = True):
         for line in open(path, encoding="utf-8").readlines():
@@ -42,6 +45,11 @@ class SavedData:
     
     def get(self) -> list[DeadlyAssaultStruct]:
         return self.data
+    
+    def get_by_id(self, id: int) -> DeadlyAssaultStruct | None:
+        for model in self.data:
+            if model.zone_id == id:
+                return model
     
     def sort(self, 
              key: 'Callable[[DeadlyAssaultStruct], Any]' = lambda x: x.start_time.to_datetime(), 

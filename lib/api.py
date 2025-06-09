@@ -6,12 +6,12 @@ from typing import TYPE_CHECKING
 from aiohttp import ClientSession, ClientResponse
 from cacheout import Cache
 
-from .data_classes import DeadlyAssaultStruct, RResultStruct, GetImagesReturnStruct
-from .enums import SeasonTypeEnum
-from .errors import ApiError, EmptyResponce
-from .settings import Config
-from .logger import get_logger
-from .utils import singleton
+from lib.data_classes import DeadlyAssaultStruct, ChallengeResultStruct, GetImagesReturnStruct
+from lib.enums import SeasonTypeEnum
+from lib.errors import ApiError, EmptyResponce
+from lib.settings import Config
+from lib.logger import get_logger
+from lib.utils import singleton
 
 if TYPE_CHECKING:
     from typing import Any
@@ -28,8 +28,8 @@ class Api:
             "Referer": "https://act.hoyolab.com/", 
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:139.0) Gecko/20100101 Firefox/139.0"
         }
-        self.mem_detail_cache = Cache(ttl=_config.api.mem_detail_cache_ttl)
-        self.image_cache = Cache(ttl=_config.api.image_cache_ttl)
+        self.mem_detail_cache = Cache(maxsize=512, ttl=_config.api.mem_detail_cache_ttl)
+        self.image_cache = Cache(maxsize=512, ttl=_config.api.image_cache_ttl)
         self.session: ClientSession = None
 
     @staticmethod
@@ -43,12 +43,6 @@ class Api:
             
         return True
     
-    async def _update_session(self) -> ClientSession:
-        if self.session is None or self.session.closed:
-            self.session = ClientSession()
-        
-        return self.session
-    
     @cached_property
     def _get_headers(self) -> dict[str, str]:        
         return self.base_headers | _config.headers
@@ -58,7 +52,13 @@ class Api:
         return f"{cfg.protocol}://{cfg.host}{cfg.zzz_api_urls.base}{cfg.zzz_api_urls.mem_detail}{'?' * (not not params)}" \
               + '&'.join(f"{key}={val}" for key, val in params.items())
     
-    async def _get_img(self, url: str, need_caching: bool = True) -> bytes:
+    async def _update_session(self) -> ClientSession:
+        if self.session is None or self.session.closed:
+            self.session = ClientSession()
+        
+        return self.session
+    
+    async def get_img(self, url: str, need_caching: bool = True) -> bytes:
         if url in self.image_cache:
             return self.image_cache.get(url)
         async with (await self._update_session()).get(url) as responce:
@@ -73,7 +73,7 @@ class Api:
         tdata = self._giret
         for key in keys[:-1]:
             tdata = tdata.setdefault(key, {})
-        tdata[keys[-1]] = await self._get_img(url)
+        tdata[keys[-1]] = await self.get_img(url)
     
     async def responce_handler(self, responce: ClientResponse) -> dict:
         responce_text = await responce.text()
@@ -120,7 +120,7 @@ class Api:
         return data
     
     
-    async def get_images(self, data: RResultStruct) -> GetImagesReturnStruct:
+    async def get_cres_images(self, data: ChallengeResultStruct) -> GetImagesReturnStruct:
         order = [[avatar.id for avatar in data.avatar_list], 
                  [*range(len(data.boss))], 
                  [*range(len(data.buffer))]]

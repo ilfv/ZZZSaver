@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from PIL import Image
 from pydantic import BaseModel
 
 
@@ -53,7 +54,7 @@ class BuddyStruct(BaseModel):
     bangboo_rectangle_url: str
     
 
-class RResultStruct(BaseModel):
+class ChallengeResultStruct(BaseModel):
     score: int
     star: int
     total_star: int
@@ -75,17 +76,21 @@ class DeadlyAssaultStruct(BaseModel):
     zone_id: int
     rank_percent: int
 
-    list: list[RResultStruct]
+    list: list[ChallengeResultStruct]
 
 
 class GIBossStruct(BaseModel):
-    icon: bytes
-    race_icon: bytes
-    bg_icon: bytes
+    model_config = {"arbitrary_types_allowed": True}
+
+    icon: bytes | Image.Image
+    race_icon: bytes | Image.Image
+    bg_icon: bytes | Image.Image
 
 
 class GetImagesReturnStruct(BaseModel):
-    avatars: list[bytes]
+    model_config = {"arbitrary_types_allowed": True}
+
+    avatars: list[bytes | Image.Image]
     boss: list[GIBossStruct]
-    buff: list[bytes]
-    buddy: bytes
+    buff: list[bytes | Image.Image]
+    buddy: bytes | Image.Image
