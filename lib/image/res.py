@@ -12,4 +12,3 @@ class Stars:
 class Others:
     dark_bg = Image.open("res/dark_bg.png")
     det_card_bg = Image.open("res/det_card_bg.png")
-    waiting = Image.open("res/wait_img.png")
