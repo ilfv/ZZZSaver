@@ -5,11 +5,11 @@ from PIL import Image, ImageDraw, ImageFont
 from lib.data_classes import AvatarStruct
 from lib.utils import singleton
 
-from .res import Grades
+from .res import Grades, Others
 from .utils import round_corners
 
 if TYPE_CHECKING:
-    from lib.data_classes import GIBossStruct
+    from lib.data_classes import GIBossStruct, BuddyStruct
 
 
 @singleton
@@ -48,6 +48,20 @@ class ImageGen:
                       race_icon)
 
         return round_corners(bg_icon.resize(resize) if resize else bg_icon, 15)
+    
+    def buddy_img(self, data: 'BuddyStruct', icon: Image.Image, 
+                  resize: tuple[int, int] | None = (60, 60)) -> Image.Image:
+        offset = 70
+        buddy = icon.copy().convert("RGBA").crop((offset, offset, 240 + offset, 240 + offset))
+
+        bg = Others.buddy_bg.copy()
+        bg.paste(buddy, (0, 0, 240, 240), buddy)
+
+        bg = bg.resize(resize) if resize else bg
+        grade = (Grades.s if data.rarity == "S" else Grades.a).resize((15, 15))
+        
+        bg.paste(grade, (2, 2, 17, 17), grade)
+        return round_corners(bg, 3)
     
     def boss_bg_img(self, data: 'GIBossStruct', 
                     bbox: tuple[int, int, int, int] = (50, 0, 300, 80)) -> Image.Image:

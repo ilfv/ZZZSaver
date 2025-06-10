@@ -12,3 +12,4 @@ class Stars:
 class Others:
     dark_bg = Image.open("res/dark_bg.png")
     det_card_bg = Image.open("res/det_card_bg.png")
+    buddy_bg = Image.open("res/buddy_bg.png")

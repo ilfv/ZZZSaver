@@ -1,7 +1,11 @@
+import re
+import tkinter as tk
+from io import BytesIO
+from threading import Thread
 from typing import TYPE_CHECKING
 
 import customtkinter as ctk
-from PIL import ImageTk
+from PIL import Image, ImageTk
 
 from lib.api import Api
 from lib.image import ImageGen
@@ -11,7 +15,75 @@ from ui.utils import bytes2pil_tk_image, imgres2pil_images, run_async
 
 if TYPE_CHECKING:
     from typing import Callable
-    from lib.data_classes import DeadlyAssaultStruct, ChallengeResultStruct
+    from lib.data_classes import DeadlyAssaultStruct, ChallengeResultStruct, BufferStruct
+
+_reg = re.compile(r"<color=(#\w{6})>(.*?)</color>")
+
+
+class BuffFrame(ctk.CTkFrame):
+    def __init__(self, master, data: 'BufferStruct', icon: Image.Image,
+                 width = 300, height = 300, 
+                 corner_radius = None, border_width = None, 
+                 bg_color = "transparent", fg_color = None, 
+                 border_color = None, background_corner_colors = None, 
+                 overwrite_preferred_drawing_method = None, **kwargs):
+        super().__init__(master, width, height, corner_radius, 
+                         border_width, bg_color, fg_color, border_color, 
+                         background_corner_colors, overwrite_preferred_drawing_method, **kwargs)
+        self.icon = icon.resize((50, 50))
+        self.img = ImageTk.PhotoImage(self.icon)
+
+        canv = ctk.CTkCanvas(self, width=50, height=50, highlightthickness=0, bg="#2b2b2b")
+        canv.pack(side=ctk.LEFT, padx=5)
+        canv.create_image(0, 0, image=self.img, anchor='nw')
+
+        ctk.CTkLabel(self, text=data.name, anchor="e", font=("Arial bold", 20), text_color=f"#ffffff").pack(pady=5)
+
+        text_box = ctk.CTkTextbox(self, width=width - 60, height=height - 60, font=("Arial", 15), wrap="word")
+        lp = 0
+        desc = data.desc.replace("\\n", "\n")
+        for match in _reg.finditer(desc):
+            start, end = match.span()
+            hex_code = match.group(1)
+            content = match.group(2)
+
+            if start > lp:
+                text_box.insert("end", desc[lp:start])
+
+            if hex_code not in text_box.tag_names():
+                text_box.tag_config(hex_code, foreground=hex_code)
+
+            text_box.insert("end", content, hex_code)
+            lp = end
+
+        if lp < len(desc):
+            text_box.insert("end", desc[lp:])
+        
+        text_box.pack()
+        text_box.configure(state=ctk.DISABLED)
+
+
+
+class BuffWindow:
+    def __init__(self, data: 'list[BufferStruct]', icons: list[Image.Image], width=300, height=300):
+        super().__init__()
+
+        root = ctk.CTkToplevel() 
+
+        root.title("Buffs")
+        root.geometry(f"{width}x{height}+1200+100")
+
+        fc_range = range(len(data))
+        if len(data) > 1:
+            master = ctk.CTkScrollableFrame(root, width, height)
+            master.pack()
+            root.bind("<Up>", lambda _: master._parent_canvas.yview_scroll(-35, 'units'))
+            root.bind("<Down>", lambda _: master._parent_canvas.yview_scroll(35, 'units'))
+        else:
+            master = root
+
+        for i in fc_range:
+            BuffFrame(master, data[i], icons[i], width=width - 20, height=height - 20).pack(pady=10)
 
 
 class DATotalFrame(ctk.CTkFrame):
@@ -93,8 +165,8 @@ class ChallengeFrame(ctk.CTkFrame):
         self.imgs = [ImageTk.PhotoImage(Others.det_card_bg), 
                      ImageTk.PhotoImage(ImageGen().boss_img(self.giimages.boss[0])),
                      [ImageTk.PhotoImage(ImageGen().avatar_img(data.avatar_list[i], self.giimages.avatars[i]))
-                      for i in range(3)],
-                     ImageTk.PhotoImage(ImageGen().boss_bg_img(self.giimages.boss[0])),
+                      for i in range(3)] + [ImageTk.PhotoImage(ImageGen().buddy_img(data.buddy, self.giimages.buddy))],
+                     ImageTk.PhotoImage(ImageGen().boss_bg_img(self.giimages.boss[0]).resize((130, 80))),
                      ImageTk.PhotoImage(Stars.dark_star), ImageTk.PhotoImage(Stars.light_star)]
 
         boss_name = data.boss[0].name
@@ -111,20 +183,24 @@ class ChallengeFrame(ctk.CTkFrame):
         for i in range(3):
             canvas.create_image(xoffset, 105, image=self.imgs[2][i])
             xoffset += 85
+        canvas.create_image(xoffset - 10, 115, image=self.imgs[2][3])
         
         canvas.create_text(245, 55, text=f"Время прохождения: {data.challenge_time.to_datetime().strftime("%d.%m.%Y %H:%M:%S")}",
                            fill="#8f8f8f", font=("Arial", 10))
-        canvas.create_image(400, 60, image=self.imgs[3], anchor="nw")
+        canvas.create_image(460, 60, image=self.imgs[3], anchor="nw")
         
-        xoffset = 430
+        xoffset = 490
         for i in range(1, 4):
             canvas.create_image(xoffset, 75, image=self.imgs[4 + (i <= data.star)])
             xoffset += 24
         
-        text = canvas.create_text(455, 105, text=data.score, font=("Arial bold", 20), fill="#ffffff")
+        text = canvas.create_text(515, 105, text=data.score, font=("Arial bold", 20), fill="#ffffff")
         bbox = canvas.bbox(text)
         rec = canvas.create_rectangle(bbox, fill="#2b2b2b")
         canvas.tag_raise(text, rec)
+
+        buff_btn = canvas.create_text(560, 20, text="Buff", font=("Arial italic", 15), fill="#a0a0a0")
+        canvas.tag_bind(buff_btn, "<Button-1>", lambda _: BuffWindow(data.buffer, self.giimages.buff))
 
 
 class DetailFrame(ctk.CTkFrame):
