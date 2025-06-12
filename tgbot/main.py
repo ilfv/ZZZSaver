@@ -7,7 +7,7 @@ from aiogram import Bot, Dispatcher
 from lib.api import Api
 from lib.logger import get_logger
 
-from commands import router as c_router
+from tgbot.commands import router as c_router
 
 _log = get_logger(__file__, "Main")
 

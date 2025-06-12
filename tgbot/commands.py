@@ -5,8 +5,8 @@ from aiogram.types import Message, CallbackQuery
 from lib.api import Api
 from lib.save_data import SavedData
 
-from buttons import Buttons
-from utils import generate_image, btext_from_challenges
+from tgbot.buttons import Buttons
+from tgbot.utils import generate_image, btext_from_challenges
 
 router = Router(name=__name__)
 
