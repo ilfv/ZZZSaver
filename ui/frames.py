@@ -1,7 +1,4 @@
 import re
-import tkinter as tk
-from io import BytesIO
-from threading import Thread
 from typing import TYPE_CHECKING
 
 import customtkinter as ctk
@@ -10,8 +7,9 @@ from PIL import Image, ImageTk
 from lib.api import Api
 from lib.image import ImageGen
 from lib.save_data import SavedData
-from lib.image.res import Stars, Others
-from ui.utils import bytes2pil_tk_image, imgres2pil_images, run_async
+from lib.image.res import GRStars, GRBackgrounds
+from lib.utils import imgres2pil_images
+from ui.utils import bytes2pil_tk_image, run_async
 
 if TYPE_CHECKING:
     from typing import Callable
@@ -112,8 +110,8 @@ class DATotalFrame(ctk.CTkFrame):
                          overwrite_preferred_drawing_method, **kwargs)
 
         self.imgs = [bytes2pil_tk_image(run_async(Api().get_img(data.avatar_icon)), (20, 20)),
-                     ImageTk.PhotoImage(Others.dark_bg),
-                     ImageTk.PhotoImage(Stars.light_star.resize((20, 20)))]
+                     ImageTk.PhotoImage(GRBackgrounds.dark_bg),
+                     ImageTk.PhotoImage(GRStars.light_star.resize((20, 20)))]
 
         self.canv = canvas = ctk.CTkCanvas(self, highlightthickness=0, width=width, height=height, bg=bg_color)
         start_time_str = data.start_time.to_datetime().strftime("%d.%m.%Y")
@@ -162,12 +160,12 @@ class ChallengeFrame(ctk.CTkFrame):
         
         self.giimages = imgres2pil_images(run_async(Api().get_cres_images(data)))
 
-        self.imgs = [ImageTk.PhotoImage(Others.det_card_bg), 
+        self.imgs = [ImageTk.PhotoImage(GRBackgrounds.det_card_bg), 
                      ImageTk.PhotoImage(ImageGen().boss_img(self.giimages.boss[0])),
                      [ImageTk.PhotoImage(ImageGen().avatar_img(data.avatar_list[i], self.giimages.avatars[i]))
                       for i in range(3)] + [ImageTk.PhotoImage(ImageGen().buddy_img(data.buddy, self.giimages.buddy))],
                      ImageTk.PhotoImage(ImageGen().boss_bg_img(self.giimages.boss[0]).resize((130, 80))),
-                     ImageTk.PhotoImage(Stars.dark_star), ImageTk.PhotoImage(Stars.light_star)]
+                     ImageTk.PhotoImage(GRStars.dark_star), ImageTk.PhotoImage(GRStars.light_star)]
 
         boss_name = data.boss[0].name
         canvas = ctk.CTkCanvas(self, width=width, height=height, highlightthickness=0, bg=bg_color)

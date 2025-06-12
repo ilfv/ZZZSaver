@@ -6,7 +6,8 @@ from typing import TYPE_CHECKING
 from aiohttp import ClientSession, ClientResponse
 from cacheout import Cache
 
-from lib.data_classes import DeadlyAssaultStruct, ChallengeResultStruct, GetImagesReturnStruct
+from lib.data_classes import DeadlyAssaultStruct, ChallengeResultStruct, GetImagesReturnStruct, GDeadlyAssaultImgsStruct
+from lib.save_data import SavedData
 from lib.enums import SeasonTypeEnum
 from lib.errors import ApiError, EmptyResponce
 from lib.settings import Config
@@ -147,3 +148,18 @@ class Api:
         del self._giret
 
         return GetImagesReturnStruct.model_validate(odata)
+    
+    async def get_deadlyassault_imgs(self, data: DeadlyAssaultStruct) -> GDeadlyAssaultImgsStruct:
+        odata = {"challenges": [], "avatar_icon": await self.get_img(data.avatar_icon)}
+        for challenge in data.list:
+            odata["challenges"].append(await self.get_cres_images(challenge))
+        return GDeadlyAssaultImgsStruct.model_validate(odata)
+    
+    async def update_saved_data(self) -> None:
+        sd = SavedData()
+        for season in range(1, 3):
+            data = await self.get_deadlyassault_info(season=season)
+            if data not in sd:
+                sd.append(data)
+        
+        sd.sort()

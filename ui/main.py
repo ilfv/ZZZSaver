@@ -15,17 +15,6 @@ if TYPE_CHECKING:
 ctk.set_appearance_mode("dark")
 
 
-async def update_info():
-    api = Api()
-    sd = SavedData()
-    for season in range(1, 3):
-        data = await api.get_deadlyassault_info(season=season)
-        if data not in sd:
-            sd.append(data)
-    
-    sd.sort()
-
-
 def da_total_btn(frame: DetailFrame) -> 'Callable[[int], None]':
     def handle(zone_id: int):
         frame.elements_update(zone_id)
@@ -57,7 +46,7 @@ class App(ctk.CTk):
 
 if __name__ == "__main__":
     try:
-        run_async(update_info())
+        run_async(Api().update_saved_data())
     except Exception as exc:
         messagebox.showerror("Error while updating data", exc)
 

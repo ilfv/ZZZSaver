@@ -1,3 +1,4 @@
+import numpy as np
 from PIL import Image, ImageDraw
 
 
@@ -17,3 +18,17 @@ def round_corners(img: Image.Image, radius: int):
     img.putalpha(alpha)
 
     return img
+
+def fade_alpha(image: Image.Image)  -> Image.Image:
+    if image.mode != 'RGBA':
+        image = image.convert('RGBA')
+
+    arr = np.array(image)
+    height, width = arr.shape[:2]
+
+    alpha_mask = np.linspace(0, 255, width, dtype=np.uint8)
+    alpha_mask = np.tile(alpha_mask, (height, 1))
+
+    arr[:, :, 3] = alpha_mask
+
+    return Image.fromarray(arr, mode='RGBA')

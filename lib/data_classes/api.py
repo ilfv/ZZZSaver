@@ -94,3 +94,10 @@ class GetImagesReturnStruct(BaseModel):
     boss: list[GIBossStruct]
     buff: list[bytes | Image.Image]
     buddy: bytes | Image.Image
+
+
+class GDeadlyAssaultImgsStruct(BaseModel):
+    model_config = {"arbitrary_types_allowed": True}
+
+    challenges: list[GetImagesReturnStruct]
+    avatar_icon: bytes | Image.Image
