@@ -1,5 +1,9 @@
+import re
+
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
+
+_pattern = re.compile(r"<color=(#\w{6})>(.*?)</color>")
 
 
 def round_corners(img: Image.Image, radius: int):

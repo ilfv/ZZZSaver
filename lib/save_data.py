@@ -7,7 +7,7 @@ from .logger import get_logger
 from .utils import singleton
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Iterable
+    from typing import Any, Callable
 
 _log = get_logger(__file__, "SavedDataApi")
 
@@ -24,7 +24,7 @@ class SavedData:
             for model in tdata.get("data", []):
                 self.data.append(DeadlyAssaultStruct.model_validate(model))
     
-    def __getitem__(self, index) -> DeadlyAssaultStruct:
+    def __getitem__(self, index: int) -> DeadlyAssaultStruct:
         return self.data[index]
     
     def __delitem__(self, index):
