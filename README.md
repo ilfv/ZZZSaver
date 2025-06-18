@@ -1,4 +1,4 @@
-# HoyoSaver
+# ZZZSaver
 Can save info about DeadlyAssault in ZZZ and respresent it on image(in TG bot) or gui
 
 # Dependencies
