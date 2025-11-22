@@ -2,20 +2,26 @@
     "logs_dir": "logs",
 
     "player": {
-        "uid": 1503424903,
+        "uid": 1500176961,
         "region": "prod_gf_eu"
     },
-
+    
     "api": {
+        "auto_update_cookies": true,
         "protocol": "https",
         "host": "sg-public-api.hoyolab.com",
-        "request_timeout": 1.5, 
-        "mem_detail_cache_ttl": 1800,
+        "responce_cache_ttl": 1800,
         "image_cache_ttl": 1800,
         "zzz_api_urls": {
             "base": "/event/game_record_zzz/api/zzz/",
-            "mem_detail": "mem_detail"
+            "deadly_assault": "mem_detail",
+            "shiyu_defense": "challenge"
         }
+    },
+
+    "local_cache": {
+        "caching": true,
+        "cache_dir": ".cache"
     },
 
     "headers": {

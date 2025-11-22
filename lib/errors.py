@@ -6,5 +6,9 @@ class ApiError(BaseError):
     ...
 
 
-class EmptyResponce(BaseError):
+class NoInternetConnection(ApiError):
+    ...
+
+
+class EmptyResponce(ApiError):
     ...

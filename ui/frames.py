@@ -1,30 +1,33 @@
-import re
+from io import BytesIO
 from typing import TYPE_CHECKING
+from threading import Thread
 
 import customtkinter as ctk
+from cacheout import Cache
 from PIL import Image, ImageTk
 
 from lib.api import Api
-from lib.image import ImageGen
+from lib.lcache import LocalCache
+from lib.image import ImageGen, SDImageGen
+from lib.image.res.deadly_assault import ResBackgrounds
 from lib.save_data import SavedData
-from lib.image.res import GRStars, GRBackgrounds
-from lib.utils import imgres2pil_images
-from ui.utils import bytes2pil_tk_image, run_async
+from lib.utils import gdeadlyassault2pil_image, sdimgs2pil
+from ui.utils import run_async, colored_text
 
 if TYPE_CHECKING:
-    from typing import Callable
-    from lib.data_classes import DeadlyAssaultStruct, ChallengeResultStruct, BufferStruct
+    from typing import Literal
 
-_reg = re.compile(r"<color=(#\w{6})>(.*?)</color>")
+    from lib.data_classes import DeadlyAssaultStruct, BufferStruct, ShiyuDefenseStruct, SDFloorDetailStruct, SDImagesStruct
 
 
 class BuffFrame(ctk.CTkFrame):
     def __init__(self, master, data: 'BufferStruct', icon: Image.Image,
-                 width = 300, height = 300, 
-                 corner_radius = None, border_width = None, 
-                 bg_color = "transparent", fg_color = None, 
-                 border_color = None, background_corner_colors = None, 
-                 overwrite_preferred_drawing_method = None, **kwargs):
+                 width: int = 300, height: int = 300, 
+                 corner_radius: int | str | None = None, border_width: int | str | None = None, 
+                 bg_color: str | tuple[str, str] | None = "transparent", fg_color: str | tuple[str, str] | None = None, 
+                 border_color: str | tuple[str, str] | None = None, 
+                 background_corner_colors: tuple[str | tuple[str, str]] | None = None, 
+                 overwrite_preferred_drawing_method: str | None = None, **kwargs):
         super().__init__(master, width, height, corner_radius, 
                          border_width, bg_color, fg_color, border_color, 
                          background_corner_colors, overwrite_preferred_drawing_method, **kwargs)
@@ -38,207 +41,314 @@ class BuffFrame(ctk.CTkFrame):
         ctk.CTkLabel(self, text=data.name, anchor="e", font=("Arial bold", 20), text_color=f"#ffffff").pack(pady=5)
 
         text_box = ctk.CTkTextbox(self, width=width - 60, height=height - 60, font=("Arial", 15), wrap="word")
-        lp = 0
-        desc = data.desc.replace("\\n", "\n")
-        for match in _reg.finditer(desc):
-            start, end = match.span()
-            hex_code = match.group(1)
-            content = match.group(2)
-
-            if start > lp:
-                text_box.insert("end", desc[lp:start])
-
-            if hex_code not in text_box.tag_names():
-                text_box.tag_config(hex_code, foreground=hex_code)
-
-            text_box.insert("end", content, hex_code)
-            lp = end
-
-        if lp < len(desc):
-            text_box.insert("end", desc[lp:])
-        
+        colored_text(data.desc.replace("\\n", "\n"), text_box)
         text_box.pack()
         text_box.configure(state=ctk.DISABLED)
 
 
-
-class BuffWindow:
+class BuffWindow(ctk.CTkToplevel):
     def __init__(self, data: 'list[BufferStruct]', icons: list[Image.Image], width=300, height=300):
         super().__init__()
 
-        root = ctk.CTkToplevel() 
-
-        root.title("Buffs")
-        root.geometry(f"{width}x{height}+1200+100")
+        self.title("Buffs")
+        self.geometry(f"{width}x{height}+1200+100")
 
         fc_range = range(len(data))
         if len(data) > 1:
-            master = ctk.CTkScrollableFrame(root, width, height)
+            master = ctk.CTkScrollableFrame(self, width, height)
             master.pack()
-            root.bind("<Up>", lambda _: master._parent_canvas.yview_scroll(-35, 'units'))
-            root.bind("<Down>", lambda _: master._parent_canvas.yview_scroll(35, 'units'))
+            self.bind("<Up>", lambda _: master._parent_canvas.yview_scroll(-35, 'units'))
+            self.bind("<Down>", lambda _: master._parent_canvas.yview_scroll(35, 'units'))
         else:
-            master = root
+            master = self
 
         for i in fc_range:
             BuffFrame(master, data[i], icons[i], width=width - 20, height=height - 20).pack(pady=10)
 
 
-class DATotalFrame(ctk.CTkFrame):
-    def __init__(self, master,
-                 data: 'DeadlyAssaultStruct',
-                 handle: 'Callable[[int], None] | None',
-                 inc_detail_btn: bool = True,
-                 corner_radius: int | str | None = None, 
-                 border_width: int | str | None = None, 
-                 bg_color: str | tuple[str, str] = "#2B2B2B",
-                 fg_color: str | tuple[str, str] = None, 
-                 border_color: str | tuple[str, str] = None, 
-                 background_corner_colors: tuple[str | tuple[str, str]] | None = None, 
-                 overwrite_preferred_drawing_method: str | None = None, **kwargs):
-        width, height = 400, 100
-
-        super().__init__(master, 
-                         width, 
-                         height, 
-                         corner_radius, 
-                         border_width, 
-                         bg_color, 
-                         fg_color, 
-                         border_color, 
-                         background_corner_colors, 
-                         overwrite_preferred_drawing_method, **kwargs)
-
-        self.imgs = [bytes2pil_tk_image(run_async(Api().get_img(data.avatar_icon)), (20, 20)),
-                     ImageTk.PhotoImage(GRBackgrounds.dark_bg),
-                     ImageTk.PhotoImage(GRStars.light_star.resize((20, 20)))]
-
-        self.canv = canvas = ctk.CTkCanvas(self, highlightthickness=0, width=width, height=height, bg=bg_color)
-        start_time_str = data.start_time.to_datetime().strftime("%d.%m.%Y")
-        end_time_str = data.end_time.to_datetime().strftime("%d.%m.%Y")
-        canvas.pack(fill=ctk.BOTH, expand=True)
-
-        canvas.create_image(0, 0, image=self.imgs[1], anchor="nw")
-        canvas.create_text(200, 8, text="Общий счет", font=("Arial", 13), fill="#ffffff")
-        canvas.create_text(200, 35, text=data.total_score, font=('Arial bold', 20), fill="#d8d8d8")
-        canvas.create_image(185, 60, image=self.imgs[2])
-        canvas.create_text(210, 60, text=f"x{data.total_star}", font=("Arial", 15), fill="#ffffff")
-        canvas.create_image(160, 85, image=self.imgs[0])
-        canvas.create_text(220, 85, text=data.nick_name, fill="#ffffff")
+class ShiyuDefenseBuffFrame(ctk.CTkFrame):
+    def __init__(self, master, name: str, title_list: list[str], text_list: list[str], width = 200, height = 200, corner_radius = None, 
+                 border_width = None, bg_color = "transparent", fg_color = None, border_color = None, background_corner_colors = None, 
+                 overwrite_preferred_drawing_method = None, **kwargs):
+        super().__init__(master, width, height, corner_radius, border_width, bg_color, fg_color, border_color, 
+                         background_corner_colors, overwrite_preferred_drawing_method, **kwargs)
         
-        canvas.create_text(55, 5, text="Период подсчёта:", fill="#8F8F8F", font=("Arial", 9))
-        canvas.create_text(62, 20, text=f"{start_time_str} - {end_time_str}", fill="#8f8f8f")
+        ctk.CTkLabel(self, text=name, font=("arial bold", 12)).pack()
+        for title, text in zip(title_list, text_list):
+            ctk.CTkLabel(self, text=title, font=("arial italic", 10)).pack()
+            textbox = ctk.CTkTextbox(self, wrap="word")
+            colored_text(text.replace("\\n", "\n"), textbox)
+            textbox.pack()
 
-        if inc_detail_btn:
-            txt = canvas.create_text(350, 10, text="Подробнее ▶", fill="#acacac", font=("Arial", 12))
-            canvas.tag_bind(txt, "<Button-1>", lambda _: handle(data.zone_id))
+
+class ShiyuDefenseBuffWindow(ctk.CTkToplevel):
+    def __init__(self, schedule_id: int, title: str = "Buff", geometry: tuple[int] = (300, 300, 800, 200), 
+                 *args, fg_color = None, **kwargs):
+        super().__init__(*args, fg_color=fg_color, **kwargs)
+
+        data = SavedData().get_by_id("shiyu_defense", schedule_id)
+
+        x, y = geometry[:2]
+        self.size = geometry[:2]
+        if geometry[2:]:
+            xoff = geometry[2]
+        else:
+            xoff = 0
+        if geometry[3:]:
+            yoff = geometry[3]
+        else:
+            yoff = 0
+
+        self.geometry(f"{x}x{y}" + (f"+{xoff}" if xoff else "") + (f"+{yoff}" if yoff else ""))
+        self.title(title)
+
+        sc_fr = ctk.CTkScrollableFrame(self)
+        sc_fr.pack(expand=True, fill=ctk.BOTH)
+
+        for floor in data.all_floor_detail:
+            ShiyuDefenseBuffFrame(sc_fr, floor.zone_name, 
+                                  (buff.title for buff in floor.buffs), (buff.text for buff in floor.buffs)).pack(pady=10)
+
+class ShiyuDefenseEnemyFrame(ctk.CTkScrollableFrame):
+    im_cache = Cache()
+
+    def __init__(self, master, data: 'SDFloorDetailStruct', icons: 'SDImagesStruct', width = 600, height = 600, corner_radius = None, 
+                 border_width = None, bg_color = "transparent", fg_color = None, border_color = None, background_corner_colors = None, 
+                 overwrite_preferred_drawing_method = None, **kwargs):
+        super().__init__(master, width, height, corner_radius, border_width, bg_color, fg_color, 
+                         border_color, background_corner_colors, overwrite_preferred_drawing_method, **kwargs)
+        ctk.CTkLabel(self, text=data.zone_name).pack()
+
+        for node in [data.node_1, data.node_2]:
+            key = str(node.monster_info)
+            if key in self.im_cache:
+                img = self.im_cache.get(key)
+            else:
+                img = SDImageGen().monsters_info(node.monster_info, icons)
+                self.im_cache.set(key, img)
+            
+            ctk.CTkLabel(self, text='', image=ctk.CTkImage(img, size=img.size)).pack(pady=10)
+
+class ShiyuDefenseEnemyWindow(ctk.CTkToplevel):
+    def __init__(self, schedule_id: int, title: str = "Enemies", geometry: tuple[int] = (650, 600, 1000, 200), 
+                 *args, fg_color = None, **kwargs):
+        super().__init__(*args, fg_color=fg_color, **kwargs)
+
+        data = SavedData().get_by_id("shiyu_defense", schedule_id)
+        icons = sdimgs2pil(run_async(Api().shiyu_defense_imgs(data)))
+
+        x, y = geometry[:2]
+        self.size = geometry[:2]
+        if geometry[2:]:
+            xoff = geometry[2]
+        else:
+            xoff = 0
+        if geometry[3:]:
+            yoff = geometry[3]
+        else:
+            yoff = 0
+
+        self.geometry(f"{x}x{y}" + (f"+{xoff}" if xoff else "") + (f"+{yoff}" if yoff else ""))
+        self.title(title)
+
+        sc_fr = ctk.CTkScrollableFrame(self)
+        sc_fr.pack(expand=True, fill=ctk.BOTH)
+
+        for floor in data.all_floor_detail:
+            ShiyuDefenseEnemyFrame(sc_fr, floor, icons).pack(pady=10)
+
+
+class BaseDetailWindow(ctk.CTkToplevel):
+    def __init__(self, title: str = "Data", geometry: tuple[int] = (700, 600, 800, 200), *args, fg_color = None, **kwargs):
+        super().__init__(*args, fg_color=fg_color, **kwargs)
+
+        x, y = geometry[:2]
+        self.size = geometry[:2]
+        if geometry[2:]:
+            xoff = geometry[2]
+        else:
+            xoff = 0
+        if geometry[3:]:
+            yoff = geometry[3]
+        else:
+            yoff = 0
+
+        self.geometry(f"{x}x{y}" + (f"+{xoff}" if xoff else "") + (f"+{yoff}" if yoff else ""))
+        self.title(title)
+        self.lab = ctk.CTkLabel(self, text="", image=ctk.CTkImage(ResBackgrounds.empty_img, size=ResBackgrounds.empty_img.size))
+        self.lab.pack()
     
+    def init(*args, **kwargs):
+        raise NotImplementedError
+    
+    @classmethod
+    def handler(cls, zone_id: int) -> None:
+        obj = cls()
+        Thread(target=obj.init, args=(zone_id,), daemon=True).start()
 
-class ChallengeFrame(ctk.CTkFrame):
-    def __init__(self, master, 
-                 data: 'ChallengeResultStruct',
-                 corner_radius: int | str | None = None, 
-                 border_width: int | str | None = None, 
-                 bg_color: str | tuple[str, str] = "#2B2B2B", 
-                 fg_color: str | tuple[str, str] = None, 
-                 border_color: str | tuple[str, str] = None, 
-                 background_corner_colors: tuple[str | tuple[str, str]] = None, 
-                 overwrite_preferred_drawing_method: str | None = None, **kwargs):
-        
-        width, height = 600, 150
 
-        super().__init__(master, 
-                         width, 
-                         height, 
-                         corner_radius, 
-                         border_width, 
-                         bg_color, 
-                         fg_color, 
-                         border_color, 
-                         background_corner_colors, 
-                         overwrite_preferred_drawing_method, **kwargs)
-        
-        self.giimages = imgres2pil_images(run_async(Api().get_cres_images(data)))
+class DADetailWindow(BaseDetailWindow):
+    def __init__(self, title: str = "Data", geometry: tuple[int] = (700, 600, 800, 200), *args, fg_color = None, **kwargs):
+        super().__init__(*args, title=title, geometry=geometry, fg_color=fg_color, **kwargs)
 
-        self.imgs = [ImageTk.PhotoImage(GRBackgrounds.det_card_bg), 
-                     ImageTk.PhotoImage(ImageGen().boss_img(self.giimages.boss[0])),
-                     [ImageTk.PhotoImage(ImageGen().avatar_img(data.avatar_list[i], self.giimages.avatars[i]))
-                      for i in range(3)] + [ImageTk.PhotoImage(ImageGen().buddy_img(data.buddy, self.giimages.buddy))],
-                     ImageTk.PhotoImage(ImageGen().boss_bg_img(self.giimages.boss[0]).resize((130, 80))),
-                     ImageTk.PhotoImage(GRStars.dark_star), ImageTk.PhotoImage(GRStars.light_star)]
+    def init(self, zone_id: int):
+        data = SavedData().get_by_id("deadly_assault", zone_id)
 
-        boss_name = data.boss[0].name
-        canvas = ctk.CTkCanvas(self, width=width, height=height, highlightthickness=0, bg=bg_color)
-        canvas.pack(fill=ctk.BOTH, expand=True)
+        if data and data.has_data:
+            icons = gdeadlyassault2pil_image(run_async(Api().deadlyassault_imgs(data)))
+        else:
+            icons = None
+        self.img = ImageTk.PhotoImage(ImageGen().generate(data, icons).resize(self.size))
 
-        canvas.create_image(0, 0, image=self.imgs[0], anchor='nw')
-        canvas.create_image(5, 5, image=self.imgs[1], anchor="nw")
-        canvas.create_text(250, 25, 
-                           text=f"{boss_name[:26]}..." if len(boss_name) > 25 else boss_name, 
-                           fill="#ffffff", font=("Arial bold", 13), justify="center")
+        self.lab.destroy()
 
-        xoffset = 160
+        can = ctk.CTkCanvas(self, width=self.size[0], height=self.size[1], highlightthickness=0)
+        can.pack(expand=True, fill=ctk.BOTH)
+        can.create_image(0, 0, image=self.img, anchor="nw")
+
         for i in range(3):
-            canvas.create_image(xoffset, 105, image=self.imgs[2][i])
-            xoffset += 85
-        canvas.create_image(xoffset - 10, 115, image=self.imgs[2][3])
-        
-        canvas.create_text(245, 55, text=f"Время прохождения: {data.challenge_time.to_datetime().strftime("%d.%m.%Y %H:%M:%S")}",
-                           fill="#8f8f8f", font=("Arial", 10))
-        canvas.create_image(460, 60, image=self.imgs[3], anchor="nw")
-        
-        xoffset = 490
-        for i in range(1, 4):
-            canvas.create_image(xoffset, 75, image=self.imgs[4 + (i <= data.star)])
-            xoffset += 24
-        
-        text = canvas.create_text(515, 105, text=data.score, font=("Arial bold", 20), fill="#ffffff")
-        bbox = canvas.bbox(text)
-        rec = canvas.create_rectangle(bbox, fill="#2b2b2b")
-        canvas.tag_raise(text, rec)
-
-        buff_btn = canvas.create_text(560, 20, text="Buff", font=("Arial italic", 15), fill="#a0a0a0")
-        canvas.tag_bind(buff_btn, "<Button-1>", lambda _: BuffWindow(data.buffer, self.giimages.buff))
+            it = can.create_text(640, 205 + (140 * i), text="Buff", font=("Arial bold italic", 15), fill="#838383")
+            can.tag_bind(it, "<Button-1>", lambda _, num=i: BuffWindow(data.list[num].buffer, icons.challenges[num].buff))
 
 
-class DetailFrame(ctk.CTkFrame):
-    def __init__(self, master,  
+class SDDetailWindow(BaseDetailWindow):
+    def __init__(self, title = "Data", geometry = (800, 600, 800, 100), *args, fg_color=None, **kwargs):
+        super().__init__(title, geometry, *args, fg_color=fg_color, **kwargs)
+
+    def init(self, schedule_id: int):
+        data = SavedData().get_by_id("shiyu_defense", schedule_id)
+
+        if data.has_data:
+            icons = sdimgs2pil(run_async(Api().shiyu_defense_imgs(data)))
+        else:
+            icons = None
+        img = SDImageGen().generate(data, icons)
+        self.img = ctk.CTkImage(img.resize((self.size[0], img.size[1])), size=(self.size[0], img.size[1]))
+
+        self.lab.destroy()
+
+        height = 60
+        btn_frame = ctk.CTkFrame(self, width=self.size[0], height=height)
+        btn_frame.pack(expand=True, fill=ctk.BOTH)
+        ctk.CTkButton(btn_frame, width=self.size[0] // 4, height=40, text="Buff", fg_color="#2b2b2b",
+                      font=("Arial bold italic", 20), text_color="#838383", 
+                      command=lambda: ShiyuDefenseBuffWindow(schedule_id)).place(x=self.size[0] // 5, y=height // 4)
+        ctk.CTkButton(btn_frame, width=self.size[0] // 4, height=40, text="Enemy", fg_color="#2b2b2b",
+                      font=("Arial bold italic", 20), text_color="#838383", 
+                      command=lambda: ShiyuDefenseEnemyWindow(schedule_id)).place(x=self.size[0] // 2, y=height // 4)
+
+        can = ctk.CTkScrollableFrame(self, width=self.size[0], height=self.size[1])
+        can.pack(expand=True, fill=ctk.BOTH)
+        ctk.CTkLabel(can, img.size[0], img.size[1], text='', image=self.img).pack()
+
+
+class MMenuScrollableFrame(ctk.CTkScrollableFrame):
+    labels: list[ctk.CTkLabel]
+
+    def __init__(self, master, 
+                 width: int = 600, 
+                 height: int = 550, 
                  corner_radius: int | str | None = None, 
                  border_width: int | str | None = None, 
                  bg_color: str | tuple[str, str] = "transparent", 
                  fg_color: str | tuple[str, str] = None, 
                  border_color: str | tuple[str, str] = None, 
-                 background_corner_colors: tuple[str | tuple[str, str]] = None, 
+                 scrollbar_fg_color: str | tuple[str, str] = None, 
+                 scrollbar_button_color: str | tuple[str, str] = None, 
+                 scrollbar_button_hover_color: str | tuple[str, str] = None, 
+                 label_fg_color: str | tuple[str, str] = None, 
+                 label_text_color: str | tuple[str, str] = None, 
+                 label_text: str = "Сохраненная информация:", 
+                 label_font: tuple | ctk.CTkFont | None = ("Arial bold", 15), 
+                 label_anchor: str = "center", 
+                 orientation: "Literal['vertical', 'horizontal']" = "vertical"):
+        super().__init__(master, width, height, corner_radius, border_width, bg_color, fg_color, border_color, 
+                         scrollbar_fg_color, scrollbar_button_color, scrollbar_button_hover_color, 
+                         label_fg_color, label_text_color, label_text, label_font, label_anchor, orientation)
+        self.im_cache = Cache()
+        self.labels = []
+
+    def update_info(self, mode_name: str, size: tuple[int, int] = (600, 180)) -> None:
+        collection = SavedData().get(mode_name)
+        local_cache = LocalCache()
+        for label in self.labels:
+            label.destroy()
+
+        if mode_name == "deadly_assault":
+            model: 'DeadlyAssaultStruct'
+            for i in range(len(collection)):
+                model = collection[i]
+                if f"d{model.zone_id}" in self.im_cache:
+                    img = self.im_cache.get(f"d{model.zone_id}")
+                else:
+                    if model.avatar_icon in local_cache:
+                        avatar_icon = Image.open(BytesIO(local_cache.get(model.avatar_icon)))
+                    else:
+                        avatar_icon = None
+
+                    img = ImageGen().main_info_st(model, avatar_icon, 
+                                                  add_sub_text="> Подробнее" if model.has_data else "").resize(size)
+                    self.im_cache.set(f"d{model.zone_id}", img)
+                    
+                lab = ctk.CTkLabel(self, text="", image=ctk.CTkImage(img, size=img.size))
+                lab.pack(pady=10)
+                self.labels.append(lab)
+
+                if model.has_data:
+                    lab.bind("<Button-1>", lambda _, mid=model.zone_id: DADetailWindow.handler(mid))
+
+        elif mode_name == "shiyu_defense":
+            model: 'ShiyuDefenseStruct'
+            for i in range(len(collection)):
+                model = collection[i]
+                if f"s{model.schedule_id}" in self.im_cache:
+                    img = self.im_cache.get(f"s{model.schedule_id}")
+                else:
+                    img = SDImageGen().main_info_st(model).resize(size)
+                    self.im_cache.set(f"s{model.schedule_id}", img)
+
+                lab = ctk.CTkLabel(self, text="", image=ctk.CTkImage(img, size=(img.size[0] - 25, img.size[1] - 50)))
+                lab.pack(pady=10)
+                self.labels.append(lab)
+
+                if model.has_data:
+                    lab.bind("<Button-1>", lambda _, mid=model.schedule_id: SDDetailWindow.handler(mid))
+
+ 
+class RadioFrame(ctk.CTkFrame):
+    init_num = 0
+    modes = ["deadly_assault", "shiyu_defense"]
+    names = ["Опасный штурм", "Оборона Шиюй"]
+
+    def __init__(self, master, info_frame: MMenuScrollableFrame, width: int = 600, height: int = 70, 
+                 btn_height: int = 15, btn_width: int = 15, btn_corner_radius: int = 15,
+                 corner_radius: int | str | None = None, border_width: int | str | None = None, 
+                 bg_color: str | tuple[str, str] = "transparent", fg_color: str | tuple[str, str] = None, 
+                 border_color: str | tuple[str, str] = None, 
+                 background_corner_colors: tuple[str | tuple[str, str]] | None = None, 
                  overwrite_preferred_drawing_method: str | None = None, **kwargs):
-        width, height = 600, 600
-        super().__init__(master, 
-                         width, 
-                         height, 
-                         corner_radius, 
-                         border_width, 
-                         bg_color, 
-                         fg_color, 
-                         border_color, 
-                         background_corner_colors, 
+        super().__init__(master, width, height, corner_radius, border_width, 
+                         bg_color, fg_color, border_color, background_corner_colors, 
                          overwrite_preferred_drawing_method, **kwargs)
-        self.current_zid = None
-        self.frames: list[ctk.CTkFrame] = []
-
-    def elements_update(self, zone_id: int):
-        if self.current_zid == zone_id:
-            return
-        self.current_zid = zone_id
         
-        for frame in self.frames:
-            frame.destroy()
+        self.info_frame = info_frame
+        
+        buttons = [ctk.CTkRadioButton(self, height=height // 2, radiobutton_height=btn_height, radiobutton_width=btn_width, 
+                                      corner_radius=btn_corner_radius, text=self.names[i], 
+                                      font=("Arial bold", 15), command=lambda num=i: self.update_val(num))
+                        for i in range(2)]
+        self.buttons = buttons
+        
+        self.last_set = self.init_num
+        buttons[self.init_num].select()
+        self.info_frame.update_info(self.modes[self.init_num])
 
-        data = SavedData().get_by_id(zone_id)
+        for i in range(2):
+            buttons[i].place(x=int(width * 0.3), y=height // 2 * i)
 
-        main_info = DATotalFrame(self, data, None, False)
-        main_info.pack(padx=100)
-
-        self.frames.append(main_info)
-        for challenge in data.list:
-            ch = ChallengeFrame(self, challenge)
-            ch.pack(pady=5)
-            self.frames.append(ch)
+    def update_val(self, ind: int) -> None:
+        if ind != self.last_set:
+            self.info_frame.update_info(self.modes[ind])
+            self.buttons[self.last_set].deselect()
+            self.last_set = ind
+        

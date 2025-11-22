@@ -1,27 +1,8 @@
-from datetime import datetime
-
 from PIL import Image
 from pydantic import BaseModel
 
+from .base import TimeStruct, AvatarStruct, BuddyStruct
 
-class TimeStruct(BaseModel):
-    year: int
-    month: int
-    day: int
-    hour: int
-    minute: int
-    second: int
-
-    def to_datetime(self):
-        return datetime(
-            self.year, 
-            self.month, 
-            self.day, 
-            self.hour, 
-            self.minute, 
-            self.second
-        )
-    
 
 class BossStruct(BaseModel):
     icon: str
@@ -34,27 +15,9 @@ class BufferStruct(BaseModel):
     icon: str
     desc: str
     name: str
-
-
-class AvatarStruct(BaseModel):
-    id: int
-    level: int
-    element_type: int
-    avatar_profession: int
-    rarity: str
-    rank: int
-    role_square_url: str
-    sub_element_type: int
-
-
-class BuddyStruct(BaseModel):
-    id: int
-    rarity: str
-    level: int
-    bangboo_rectangle_url: str
     
 
-class ChallengeResultStruct(BaseModel):
+class DAChallengeResultStruct(BaseModel):
     score: int
     star: int
     total_star: int
@@ -69,6 +32,7 @@ class DeadlyAssaultStruct(BaseModel):
     start_time: TimeStruct
     end_time: TimeStruct
 
+    has_data: bool
     nick_name: str
     avatar_icon: str
     total_score: int
@@ -76,7 +40,10 @@ class DeadlyAssaultStruct(BaseModel):
     zone_id: int
     rank_percent: int
 
-    list: list[ChallengeResultStruct]
+    list: list[DAChallengeResultStruct]
+
+    def __eq__(self, value):
+        return isinstance(value, self.__class__) and self.zone_id == value.zone_id
 
 
 class GIBossStruct(BaseModel):
@@ -87,7 +54,7 @@ class GIBossStruct(BaseModel):
     bg_icon: bytes | Image.Image
 
 
-class GetImagesReturnStruct(BaseModel):
+class ChallengeGIStruct(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
 
     avatars: list[bytes | Image.Image]
@@ -99,5 +66,5 @@ class GetImagesReturnStruct(BaseModel):
 class GDeadlyAssaultImgsStruct(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
 
-    challenges: list[GetImagesReturnStruct]
+    challenges: list[ChallengeGIStruct]
     avatar_icon: bytes | Image.Image

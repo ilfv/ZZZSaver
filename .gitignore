@@ -1,6 +1,7 @@
 __pycache__
 .venv
-test*.*
+.cache
+test*
 logs/
 .env
-data.json
+data/
