@@ -1,5 +1,5 @@
 # HoyoSaver
-Can save info about DeadlyAssault in ZZZ and respresent it on image(in TG bot) or gui
+Can save info about DeadlyAssault in ZZZ and respresent it on gui
 
 # Dependencies
 [Python 3.11](https://www.python.org/downloads/release/python-3110/) or later
