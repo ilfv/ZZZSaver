@@ -1,5 +1,5 @@
-# ZZZSaver
-Can save info about Deadly Assault and Shiyu Defense in ZZZ and respresent it through the gui
+# HoyoSaver
+Can save info about DeadlyAssault in ZZZ and respresent it on image(in TG bot) or gui
 
 # Dependencies
 [Python 3.11](https://www.python.org/downloads/release/python-3110/) or later
