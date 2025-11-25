@@ -21,9 +21,6 @@ class Cookie(str):
     def __str__(self):
         return '"' + '; '.join(f"{key}={value}" for key, value in self.data.items()) + '"'
     
-    def __getitem__(self, key: str) -> str:
-        return self.data[key]
-    
     def __setitem__(self, key: str, value):
         self.data[key] = value
 
