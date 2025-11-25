@@ -60,7 +60,7 @@ class Api:
     
     async def _update_session(self) -> ClientSession:
         if self.session is None or self.session.closed:
-            self.session = ClientSession()
+            self.session = ClientSession(cookie_jar=None)
         
         return self.session
 
